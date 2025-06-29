@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>クイズアプリ</title>
+    <title>【画像付き】カスタム出題数・ヒントモーダル付きクイズアプリ</title>
     <!-- Tailwind CSSを読み込みます -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -46,7 +46,7 @@
     <!-- クイズ本体 (初期状態では非表示) -->
     <div id="quiz-container" class="bg-white p-6 sm:p-8 rounded-2xl shadow-xl w-11/12 max-w-2xl hidden">
         <!-- 問題画像 -->
-        <img id="question-image" src="" alt="問題の関連画像" class="w-full h-48 object-cover rounded-lg mb-6 bg-gray-200" onerror="this.style.display='none'">
+
         
         <div class="mb-6">
             <h2 id="question-number" class="text-xl sm:text-2xl font-bold text-indigo-600 mb-2"></h2>
@@ -131,7 +131,7 @@
         const numQuestionsInput = document.getElementById('num-questions-input');
         const setupError = document.getElementById('setup-error');
         
-        const questionImageEl = document.getElementById('question-image');
+
         const questionNumberEl = document.getElementById('question-number');
         const questionTextEl = document.getElementById('question-text');
         const optionsContainer = document.getElementById('options-container');
@@ -161,13 +161,7 @@
             resetState();
             const currentQuiz = gameQuizData[currentQuizIndex];
 
-            // 画像の表示
-            if (currentQuiz.image) {
-                questionImageEl.src = currentQuiz.image;
-                questionImageEl.style.display = 'block';
-            } else {
-                questionImageEl.style.display = 'none';
-            }
+
             
             questionNumberEl.textContent = `問題 ${currentQuizIndex + 1} / ${gameQuizData.length}`;
             questionTextEl.textContent = currentQuiz.question;
@@ -194,9 +188,12 @@
         }
 
         function selectAnswer(selectedButton, selectedOption) {
-            // 全ての選択肢を無効化
             Array.from(optionsContainer.children).forEach(button => {
                 button.disabled = true;
+                if (button.textContent === gameQuizData[currentQuizIndex].answer) {
+                    button.classList.add('bg-emerald-500', 'text-white');
+                    button.classList.remove('bg-gray-200', 'hover:bg-gray-300');
+                }
             });
 
             if (selectedOption === gameQuizData[currentQuizIndex].answer) {
@@ -204,10 +201,13 @@
                 resultTextEl.textContent = '正解！🎉';
                 resultTextEl.classList.add('text-emerald-500');
                 resultTextEl.classList.remove('text-red-500');
+                selectedButton.classList.add('ring-4', 'ring-emerald-300');
             } else {
                 resultTextEl.textContent = '不正解...';
                 resultTextEl.classList.add('text-red-500');
                 resultTextEl.classList.remove('text-emerald-500');
+                selectedButton.classList.add('bg-red-500', 'text-white', 'ring-4', 'ring-red-300');
+                selectedButton.classList.remove('bg-gray-200', 'hover:bg-gray-300');
             }
             hintBtn.disabled = true;
             hintBtn.classList.add('opacity-50', 'cursor-not-allowed');
