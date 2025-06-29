@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>テストクイズ</title>
+    <title>クイズアプリ</title>
     <!-- Tailwind CSSを読み込みます -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -194,12 +194,9 @@
         }
 
         function selectAnswer(selectedButton, selectedOption) {
+            // 全ての選択肢を無効化
             Array.from(optionsContainer.children).forEach(button => {
                 button.disabled = true;
-                if (button.textContent === gameQuizData[currentQuizIndex].answer) {
-                    button.classList.add('bg-emerald-500', 'text-white');
-                    button.classList.remove('bg-gray-200', 'hover:bg-gray-300');
-                }
             });
 
             if (selectedOption === gameQuizData[currentQuizIndex].answer) {
@@ -207,13 +204,10 @@
                 resultTextEl.textContent = '正解！🎉';
                 resultTextEl.classList.add('text-emerald-500');
                 resultTextEl.classList.remove('text-red-500');
-                selectedButton.classList.add('ring-4', 'ring-emerald-300');
             } else {
                 resultTextEl.textContent = '不正解...';
                 resultTextEl.classList.add('text-red-500');
                 resultTextEl.classList.remove('text-emerald-500');
-                selectedButton.classList.add('bg-red-500', 'text-white', 'ring-4', 'ring-red-300');
-                selectedButton.classList.remove('bg-gray-200', 'hover:bg-gray-300');
             }
             hintBtn.disabled = true;
             hintBtn.classList.add('opacity-50', 'cursor-not-allowed');
