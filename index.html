@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【画像付き】カスタム出題数・ヒントモーダル付きクイズアプリ</title>
+    <!-- Tailwind CSSを読み込みます -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* フォントや基本的なスタイルを設定します */
+        body {
+            font-family: 'Inter', 'Helvetica Neue', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+        }
+        /* モーダルのアニメーション */
+        .modal-enter {
+            animation: fadeIn 0.3s ease-out;
+        }
+        .modal-leave {
+            animation: fadeOut 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.95); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen py-8">
+
+    <!-- 初期設定画面 -->
+    <div id="setup-container" class="bg-white p-8 rounded-2xl shadow-xl w-11/12 max-w-md text-center">
+        <h1 class="text-2xl sm:text-3xl font-bold text-indigo-600 mb-6">クイズ設定</h1>
+        <div class="mb-6">
+            <label for="num-questions-input" class="block text-gray-700 text-lg mb-2">何問挑戦しますか？ (1〜40)</label>
+            <input type="number" id="num-questions-input" min="1" max="40" value="10" class="w-full px-4 py-3 text-center text-xl border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+            <p id="setup-error" class="text-red-500 h-5 mt-2"></p>
+        </div>
+        <button id="start-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg transition duration-300 ease-in-out shadow-lg text-xl">
+            クイズを開始！
+        </button>
+    </div>
+
+    <!-- クイズ本体 (初期状態では非表示) -->
+    <div id="quiz-container" class="bg-white p-6 sm:p-8 rounded-2xl shadow-xl w-11/12 max-w-2xl hidden">
+        <!-- 問題画像 -->
+        <img id="question-image" src="" alt="問題の関連画像" class="w-full h-48 object-cover rounded-lg mb-6 bg-gray-200" onerror="this.style.display='none'">
+        
+        <div class="mb-6">
+            <h2 id="question-number" class="text-xl sm:text-2xl font-bold text-indigo-600 mb-2"></h2>
+            <p id="question-text" class="text-gray-800 text-lg sm:text-xl leading-relaxed"></p>
+        </div>
+        <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"></div>
+        <div class="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
+            <button id="hint-btn" class="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300 ease-in-out shadow-md">
+                ヒントを見る
+            </button>
+            <div id="result-container" class="text-center sm:text-right">
+                 <p id="result-text" class="text-2xl font-bold h-8"></p>
+            </div>
+        </div>
+        <div class="mt-8 text-center">
+            <button id="next-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg transition duration-300 ease-in-out shadow-lg hidden">
+                次の問題へ
+            </button>
+        </div>
+    </div>
+
+    <!-- ヒント用モーダルウィンドウ (初期状態では非表示) -->
+    <div id="hint-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 hidden">
+        <div id="modal-content" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-lg text-center relative">
+            <h3 class="text-2xl font-bold text-amber-600 mb-4">ヒント</h3>
+            <p id="modal-hint-text" class="text-gray-800 text-lg mb-6"></p>
+            <button id="close-modal-btn" class="w-full sm:w-auto bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-8 rounded-lg transition duration-300">
+                閉じる
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- クイズデータ (全40問, 画像付き) ---
+        const quizData = [
+            { question: "DNAとRNAに共通して含まれる成分は次のうちどれですか？", options: ["デオキシリボース", "チミン", "リン酸", "リボース"], answer: "リン酸", hint: "ヌクレオチドは、リン酸、糖、塩基から構成されます。", image: "https://placehold.co/600x300/A78BFA/FFFFFF?text=DNA%E3%81%A8RNA" },
+            { question: "DNAがヌクレオチドのつながりで作られている構造を何と呼びますか？", options: ["二重らせん構造", "アミノ酸配列", "セントラルドグマ", "塩基配列"], answer: "二重らせん構造", hint: "図に示されている、らせん状のハシゴのような形です。", image: "https://placehold.co/600x300/60A5FA/FFFFFF?text=%E4%BA%8C%E9%87%8D%E3%82%89%E3%81%9B%E3%82%93%E6%A7%8B%E9%80%A0" },
+            { question: "ヒトの体をつくるタンパク質は、何種類のアミノ酸がつながってできていますか？", options: ["4種類", "16種類", "20種類", "64種類"], answer: "20種類", hint: "もし塩基2つの配列であったら、4×4=16通りしかなく、アミノ酸に対応できません。", image: "https://placehold.co/600x300/FBBF24/FFFFFF?text=%E3%82%A2%E3%83%9F%E3%83%8E%E9%85%B8" },
+            { question: "生物に共通した基本原理とされる「セントラルドグマ」とは何ですか？", options: ["遺伝子が突然変化すること", "DNAからタンパク質が作られる流れ", "細胞が分裂して増えること", "生物が環境に適応すること"], answer: "DNAからタンパク質が作られる流れ", hint: "DNA → (転写) → RNA → (翻訳) → タンパク質、という一連の流れです。", image: "https://placehold.co/600x300/EC4899/FFFFFF?text=%E3%82%BB%E3%83%B3%E3%83%88%E3%83%A9%E3%83%AB%E3%83%89%E3%82%B0%E3%83%9E" },
+            { question: "ヒトの体の約65%を占める物質は何ですか？", options: ["水", "タンパク質", "脂質", "炭水化物"], answer: "水", hint: "タンパク質は約15%です。", image: "https://placehold.co/600x300/3B82F6/FFFFFF?text=%E4%BA%BA%E4%BD%93%E3%81%AE%E6%88%90%E5%88%86" },
+            { question: "酸素が多いところでは酸素と結合し、少ないところでは酸素を放出する性質を持つタンパク質は何ですか？", options: ["ヘモグロビン", "クリスタリン", "アクチン", "ミオシン"], answer: "ヘモグロビン", hint: "血液中で酸素を運ぶ役割を担っています。", image: "https://placehold.co/600x300/EF4444/FFFFFF?text=%E3%83%98%E3%83%A2%E3%82%B0%E3%83%AD%E3%83%93%E3%83%B3" },
+            { question: "筋肉が伸縮できるような構造をつくっているタンパク質の組み合わせはどれですか？", options: ["アクチンとミオシン", "アデニンとグアニン", "DNAとRNA", "ヘモグロビンとクリスタリン"], answer: "アクチンとミオシン", hint: "この2つが組み合わさって、筋肉は力を発揮します。", image: "https://placehold.co/600x300/F97316/FFFFFF?text=%E7%AD%8B%E8%82%89" },
+            { question: "DNAのヌクレオチドに含まれる糖は何ですか？", options: ["デオキシリボース", "リボース", "グルコース", "フルクトース"], answer: "デオキシリボース", hint: "DNAの'D'はこの糖の名前に由来します。", image: "https://placehold.co/600x300/10B981/FFFFFF?text=DNA%E3%81%AE%E7%B3%96" },
+            { question: "RNAのヌクレオチドに含まれる塩基で、DNAにはないものはどれですか？", options: ["アデニン", "グアニン", "シトシン", "ウラシル"], answer: "ウラシル", hint: "DNAでは、この代わりにチミン(T)が使われます。", image: "https://placehold.co/600x300/8B5CF6/FFFFFF?text=RNA%E3%81%AE%E5%A1%A9%E5%9F%BA" },
+            { question: "DNAの遺伝情報からRNAが作られる過程を何と呼びますか？", options: ["転写", "翻訳", "複製", "分解"], answer: "転写", hint: "情報を「写し取る」プロセスです。", image: "https://placehold.co/600x300/6366F1/FFFFFF?text=%E8%BB%A2%E5%86%99" },
+            { question: "RNAの情報をもとにタンパク質が合成される過程を何と呼びますか？", options: ["翻訳", "転写", "複製", "分解"], answer: "翻訳", hint: "塩基の「言葉」をアミノ酸の「言葉」に「訳す」プロセスです。", image: "https://placehold.co/600x300/D946EF/FFFFFF?text=%E7%BF%BB%E8%A8%B3" },
+            { question: "DNAの二重らせん構造で、シトシン(C)と対をなす塩基は何ですか？", options: ["グアニン(G)", "アデニン(A)", "チミン(T)", "ウラシル(U)"], answer: "グアニン(G)", hint: "GとC、AとTがそれぞれペアになります。", image: "https://placehold.co/600x300/14B8A6/FFFFFF?text=%E5%A1%A9%E5%9F%BA%E5%AF%BE" },
+            { question: "遺伝子の本体であり、核の中にある染色体上に存在するものは何ですか？", options: ["遺伝子", "タンパク質", "アミノ酸", "リボソーム"], answer: "遺伝子", hint: "親から子へ形質を伝える情報の単位です。", image: "https://placehold.co/600x300/0EA5E9/FFFFFF?text=%E9%81%BA%E4%BC%9D%E5%AD%90" },
+            { question: "ヒトの体のうち、タンパク質が占める割合はどのくらいですか？", options: ["約5%", "約15%", "約25%", "約35%"], answer: "約15%", hint: "水が約65%で最も多く、その次がタンパク質です。", image: "https://placehold.co/600x300/F59E0B/FFFFFF?text=%E3%82%BF%E3%83%B3%E3%83%91%E3%82%AF%E8%B3%AA" },
+            { question: "ヌクレオチドを構成する3つの要素に含まれないものはどれですか？", options: ["リン酸", "糖", "塩基", "アミノ酸"], answer: "アミノ酸", hint: "アミノ酸はタンパク質の構成要素です。", image: "https://placehold.co/600x300/4F46E5/FFFFFF?text=%E3%83%8C%E3%82%AF%E3%83%AC%E3%82%AA%E3%83%81%E3%83%89" },
+            { question: "DNAの塩基は何種類ありますか？", options: ["1種類", "2種類", "3種類", "4種類"], answer: "4種類", hint: "アデニン(A)、チミン(T)、グアニン(G)、シトシン(C)の4つです。", image: "https://placehold.co/600x300/22C55E/FFFFFF?text=DNA%E3%81%AE%E5%A1%A9%E5%9F%BA" },
+            { question: "3つの塩基の組み合わせで1つのアミノ酸を指定しますが、その組み合わせは何通りありますか？", options: ["16通り", "20通り", "64通り", "256通り"], answer: "64通り", hint: "4種類の塩基が3つ並ぶので、4×4×4で計算できます。", image: "https://placehold.co/600x300/9333EA/FFFFFF?text=64%E9%80%9A%E3%82%8A" },
+            { question: "体内で情報を伝達したり、体の反応を調節したりするタンパク質を何と呼びますか？", options: ["ホルモン", "抗体", "酵素", "ヘモグロビン"], answer: "ホルモン", hint: "画像Cの選択肢の一つです。", image: "https://placehold.co/600x300/BE185D/FFFFFF?text=%E3%83%9B%E3%83%AB%E3%83%A2%E3%83%B3" },
+            { question: "目の水晶体の主成分であるタンパク質は何ですか？", options: ["クリスタリン", "アクチン", "ミオシン", "コラーゲン"], answer: "クリスタリン", hint: "画像Cの選択肢の一つです。", image: "https://placehold.co/600x300/0284C7/FFFFFF?text=%E3%82%AF%E3%83%AA%E3%82%B9%E3%82%BF%E3%83%AA%E3%83%B3" },
+            { question: "病原体などの異物から体を守るタンパク質を何と呼びますか？", options: ["抗体", "ホルモン", "ヘモグロビン", "酵素"], answer: "抗体", hint: "免疫の働きを担います。画像Cの選択肢の一つです。", image: "https://placehold.co/600x300/059669/FFFFFF?text=%E6%8A%97%E4%BD%93" },
+            { question: "DNAの遺伝情報が保存されている細胞内の場所はどこですか？", options: ["核", "細胞膜", "リボソーム", "ミトコンドリア"], answer: "核", hint: "画像の説明文に「核の中にある染色体上に遺伝子がある」とあります。", image: "https://placehold.co/600x300/7C3AED/FFFFFF?text=%E7%B4%B0%E8%83%9E%E6%A0%B8" },
+            { question: "DNAの二重らせん構造で、外側の骨格を形成しているのは何と何ですか？", options: ["リン酸と糖", "塩基とアミノ酸", "リン酸と塩基", "糖とアミノ酸"], answer: "リン酸と糖", hint: "図を見ると、ハシゴの縦棒の部分にあたります。", image: "https://placehold.co/600x300/2563EB/FFFFFF?text=DNA%E3%81%AE%E9%AA%A8%E6%A0%BC" },
+            { question: "DNAの二重らせん構造で、内側の「段」を形成しているのは何ですか？", options: ["塩基の対", "リン酸の対", "糖の対", "アミノ酸の対"], answer: "塩基の対", hint: "AとT、GとCのペアがハシゴの横棒の部分にあたります。", image: "https://placehold.co/600x300/16A34A/FFFFFF?text=%E5%A1%A9%E5%9F%BA%E3%81%AE%E5%AF%BE" },
+            { question: "遺伝情報に基づいてタンパク質が作られる、一連の過程の最終産物は何ですか？", options: ["タンパク質", "DNA", "RNA", "アミノ酸"], answer: "タンパク質", hint: "セントラルドグマのゴールです。", image: "https://placehold.co/600x300/CA8A04/FFFFFF?text=%E3%82%BF%E3%83%B3%E3%83%91%E3%82%AF%E8%B3%AA%E5%90%88%E6%88%90" },
+            { question: "DNAを構成する塩基「アデニン」の記号は何ですか？", options: ["A", "T", "G", "C"], answer: "A", hint: "A, T, G, C のうちの一つです。", image: "https://placehold.co/600x300/DC2626/FFFFFF?text=%E3%82%A2%E3%83%87%E3%83%8B%E3%83%B3(A)" },
+            { question: "DNAを構成する塩基「チミン」の記号は何ですか？", options: ["T", "A", "G", "C"], answer: "T", hint: "A, T, G, C のうちの一つです。", image: "https://placehold.co/600x300/2563EB/FFFFFF?text=%E3%83%81%E3%83%9F%E3%83%B3(T)" },
+            { question: "DNAを構成する塩基「グアニン」の記号は何ですか？", options: ["G", "A", "T", "C"], answer: "G", hint: "A, T, G, C のうちの一つです。", image: "https://placehold.co/600x300/16A34A/FFFFFF?text=%E3%82%B0%E3%82%A2%E3%83%8B%E3%83%B3(G)" },
+            { question: "DNAを構成する塩基「シトシン」の記号は何ですか？", options: ["C", "A", "T", "G"], answer: "C", hint: "A, T, G, C のうちの一つです。", image: "https://placehold.co/600x300/F59E0B/FFFFFF?text=%E3%82%B7%E3%83%88%E3%82%B7%E3%83%B3(C)" },
+            { question: "RNAの糖は何ですか？", options: ["リボース", "デオキシリボース", "グルコース", "マルトース"], answer: "リボース", hint: "RNAの 'R' はこの糖の名前に由来します。", image: "https://placehold.co/600x300/7E22CE/FFFFFF?text=RNA%E3%81%AE%E7%B3%96" },
+            { question: "タンパク質は何が多数つながってできていますか？", options: ["アミノ酸", "ヌクレオチド", "塩基", "糖"], answer: "アミノ酸", hint: "20種類のアミノ酸が鎖状につながっています。", image: "https://placehold.co/600x300/DB2777/FFFFFF?text=%E3%82%A2%E3%83%9F%E3%83%8E%E9%85%B8%E3%81%AE%E9%80%A3%E9%8E%96" },
+            { question: "「遺伝子」の定義として最も近いものはどれですか？", options: ["DNA上のタンパク質の設計図となる領域", "細胞の核全体", "生物の全遺伝情報", "アミノ酸の配列"], answer: "DNA上のタンパク質の設計図となる領域", hint: "染色体上に存在する、特定の情報を持つ部分です。", image: "https://placehold.co/600x300/4338CA/FFFFFF?text=%E9%81%BA%E4%BC%9D%E5%AD%90%E3%81%AE%E5%AE%9A%E7%BE%A9" },
+            { question: "ヒトの体の約15%を占める物質は何ですか？", options: ["タンパク質", "水", "脂質", "無機物"], answer: "タンパク質", hint: "水の次に多い成分です。", image: "https://placehold.co/600x300/F59E0B/FFFFFF?text=%E4%BA%BA%E4%BD%93%E3%81%AE15%25" },
+            { question: "ヒトの体の約20%を占める「脂質や炭水化物、無機物」以外の主要な2つの成分は何ですか？", options: ["水とタンパク質", "水とアミノ酸", "タンパク質と塩基", "DNAとRNA"], answer: "水とタンパク質", hint: "水が約65%、タンパク質が約15%です。", image: "https://placehold.co/600x300/38BDF8/FFFFFF?text=%E4%B8%BB%E8%A6%81%E6%88%90%E5%88%86" },
+            { question: "DNAとRNAの両方に含まれる塩基は、アデニン、グアニンとあと一つは何ですか？", options: ["シトシン", "チミン", "ウラシル", "リボース"], answer: "シトシン", hint: "A, G, C は共通しています。", image: "https://placehold.co/600x300/A3E635/FFFFFF?text=%E5%85%B1%E9%80%9A%E3%81%AE%E5%A1%A9%E5%9F%BA" },
+            { question: "DNAに特有で、RNAにはない塩基は何ですか？", options: ["チミン", "シトシン", "ウラシル", "アデニン"], answer: "チミン", hint: "RNAではウラシル(U)に置き換わります。", image: "https://placehold.co/600x300/FB923C/FFFFFF?text=DNA%E7%89%B9%E6%9C%89%E3%81%AE%E5%A1%A9%E5%9F%BA" },
+            { question: "DNAの遺伝情報からタンパク質へ、という情報の流れの最初のステップは何ですか？", options: ["転写", "翻訳", "複製", "結合"], answer: "転写", hint: "DNAの情報をRNAに写し取ります。", image: "https://placehold.co/600x300/C084FC/FFFFFF?text=%E6%9C%80%E5%88%9D%E3%81%AE%E3%82%B9%E3%83%86%E3%83%83%E3%83%97" },
+            { question: "DNAの情報伝達において、「翻訳」のプロセスで何が合成されますか？", options: ["タンパク質", "RNA", "DNA", "ヌクレオチド"], answer: "タンパク質", hint: "RNAの塩基配列がアミノ酸配列に「翻訳」されます。", image: "https://placehold.co/600x300/F472B6/FFFFFF?text=%E7%BF%BB%E8%A8%B3%E3%81%AE%E7%94%A3%E7%89%A9" },
+            { question: "親から子へ形質を伝える情報のことを何と呼びますか？", options: ["遺伝情報", "タンパク質情報", "細胞情報", "環境情報"], answer: "遺伝情報", hint: "その本体がDNAです。", image: "https://placehold.co/600x300/5EEAD4/FFFFFF?text=%E9%81%BA%E4%BC%9D%E6%83%85%E5%A0%B1" },
+            { question: "DNAを構成するヌクレオチドの「塩基」の部分の役割は何ですか？", options: ["遺伝情報をコードする", "構造を支える", "エネルギーを供給する", "他の分子と結合する"], answer: "遺伝情報をコードする", hint: "A,T,G,Cの並び順そのものが情報です。", image: "https://placehold.co/600x300/9CA3AF/FFFFFF?text=%E5%A1%A9%E5%9F%BA%E3%81%AE%E5%BD%B9%E5%89%B2" },
+            { question: "画像に示されている「二重らせん構造」を発見したとされる科学者の組み合わせは？", options: ["ワトソンとクリック", "メンデルとダーウィン", "シュライデンとシュワン", "パスツールとコッホ"], answer: "ワトソンとクリック", hint: "この問題は画像からの推測ですが、非常に有名な発見です。", image: "https://placehold.co/600x300/818CF8/FFFFFF?text=%E7%99%BA%E8%A6%8B%E8%80%85" }
+        ];
+
+        // --- DOM要素の取得 ---
+        const setupContainer = document.getElementById('setup-container');
+        const quizContainer = document.getElementById('quiz-container');
+        const startBtn = document.getElementById('start-btn');
+        const numQuestionsInput = document.getElementById('num-questions-input');
+        const setupError = document.getElementById('setup-error');
+        
+        const questionImageEl = document.getElementById('question-image');
+        const questionNumberEl = document.getElementById('question-number');
+        const questionTextEl = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const resultTextEl = document.getElementById('result-text');
+        const nextBtn = document.getElementById('next-btn');
+
+        const hintBtn = document.getElementById('hint-btn');
+        const hintModal = document.getElementById('hint-modal');
+        const modalContent = document.getElementById('modal-content');
+        const modalHintText = document.getElementById('modal-hint-text');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+
+        // --- 変数の初期化 ---
+        let gameQuizData = [];
+        let currentQuizIndex = 0;
+        let score = 0;
+
+        // --- 関数の定義 ---
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function loadQuiz() {
+            resetState();
+            const currentQuiz = gameQuizData[currentQuizIndex];
+
+            // 画像の表示
+            if (currentQuiz.image) {
+                questionImageEl.src = currentQuiz.image;
+                questionImageEl.style.display = 'block';
+            } else {
+                questionImageEl.style.display = 'none';
+            }
+            
+            questionNumberEl.textContent = `問題 ${currentQuizIndex + 1} / ${gameQuizData.length}`;
+            questionTextEl.textContent = currentQuiz.question;
+            optionsContainer.innerHTML = '';
+            
+            const shuffledOptions = [...currentQuiz.options];
+            shuffle(shuffledOptions);
+
+            shuffledOptions.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.classList.add('bg-gray-200', 'hover:bg-gray-300', 'text-gray-800', 'font-semibold', 'py-3', 'px-4', 'rounded-lg', 'transition', 'duration-300', 'ease-in-out', 'w-full', 'text-left', 'sm:text-center');
+                button.addEventListener('click', () => selectAnswer(button, option));
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        function resetState() {
+            resultTextEl.textContent = '';
+            nextBtn.classList.add('hidden');
+            hintBtn.disabled = false;
+            hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            hintBtn.classList.add('bg-amber-500', 'hover:bg-amber-600');
+        }
+
+        function selectAnswer(selectedButton, selectedOption) {
+            Array.from(optionsContainer.children).forEach(button => {
+                button.disabled = true;
+                if (button.textContent === gameQuizData[currentQuizIndex].answer) {
+                    button.classList.add('bg-emerald-500', 'text-white');
+                    button.classList.remove('bg-gray-200', 'hover:bg-gray-300');
+                }
+            });
+
+            if (selectedOption === gameQuizData[currentQuizIndex].answer) {
+                score++;
+                resultTextEl.textContent = '正解！🎉';
+                resultTextEl.classList.add('text-emerald-500');
+                resultTextEl.classList.remove('text-red-500');
+                selectedButton.classList.add('ring-4', 'ring-emerald-300');
+            } else {
+                resultTextEl.textContent = '不正解...';
+                resultTextEl.classList.add('text-red-500');
+                resultTextEl.classList.remove('text-emerald-500');
+                selectedButton.classList.add('bg-red-500', 'text-white', 'ring-4', 'ring-red-300');
+                selectedButton.classList.remove('bg-gray-200', 'hover:bg-gray-300');
+            }
+            hintBtn.disabled = true;
+            hintBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            nextBtn.classList.remove('hidden');
+            if (currentQuizIndex === gameQuizData.length - 1) {
+                nextBtn.textContent = '結果を見る';
+            }
+        }
+
+        function showResults() {
+            quizContainer.innerHTML = `
+                <div class="text-center p-4">
+                    <h2 class="text-3xl font-bold text-indigo-600 mb-4">クイズ終了！</h2>
+                    <p class="text-xl text-gray-800 mb-6">あなたの正解数は ${gameQuizData.length} 問中 ${score} 問でした！</p>
+                    <button onclick="location.reload()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg transition duration-300 ease-in-out shadow-lg">
+                        もう一度挑戦する
+                    </button>
+                </div>
+            `;
+        }
+        
+        function showHintModal() {
+            modalHintText.textContent = gameQuizData[currentQuizIndex].hint;
+            hintModal.classList.remove('hidden');
+            modalContent.classList.remove('modal-leave');
+            modalContent.classList.add('modal-enter');
+        }
+
+        function hideHintModal() {
+            modalContent.classList.remove('modal-enter');
+            modalContent.classList.add('modal-leave');
+            setTimeout(() => {
+                hintModal.classList.add('hidden');
+            }, 300); // アニメーションの時間と合わせる
+        }
+
+        // --- イベントリスナー ---
+        startBtn.addEventListener('click', () => {
+            const num = parseInt(numQuestionsInput.value);
+            if (isNaN(num) || num < 1 || num > 40) {
+                setupError.textContent = '1から40の間の数字を入力してください。';
+                return;
+            }
+            setupError.textContent = '';
+            
+            shuffle(quizData);
+            gameQuizData = quizData.slice(0, num);
+            
+            setupContainer.classList.add('hidden');
+            quizContainer.classList.remove('hidden');
+            
+            loadQuiz();
+        });
+
+        hintBtn.addEventListener('click', showHintModal);
+        closeModalBtn.addEventListener('click', hideHintModal);
+        hintModal.addEventListener('click', (e) => {
+            if (e.target === hintModal) {
+                hideHintModal();
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            currentQuizIndex++;
+            if (currentQuizIndex < gameQuizData.length) {
+                loadQuiz();
+            } else {
+                showResults();
+            }
+        });
+    </script>
+</body>
+</html>
